@@ -8,16 +8,17 @@ type move =
   | L (* gauche *)
   | R (* droite *)
 
-type players = ((int * int) * int) array (* tableau d'entier, avec l'entier représentant le nombre de murs restants *)
-type board = (wall option) array array
+type players = ((int * int) * int) array (* tableau des joueurs : couple position (x, y) * murs restants *)
+type board = (wall option) array array (* plateau de jeu : tableau 2D des murs *)
 type game = board * players
 
-let dim = 9
+let dim = 9 (* dimensions du jeu *)
 
+(* * Initialisation du jeu * *)
 let init_game nb_p : game =
   if nb_p <> 2 && nb_p <> 4 then failwith "Seulement 2 ou 4 joueurs."
   else begin
-    let nb_w = 20/nb_p in
+    let nb_w = 20/nb_p in (* 20 murs distribués équitablements *)
     let players = Array.make nb_p ((0, dim/2), nb_w) in
     players.(1) <- (dim-1, dim/2), nb_w;
     if nb_p = 4 then begin
@@ -28,7 +29,6 @@ let init_game nb_p : game =
   end
 
 (* * Affichage * *)
-
 let char_of_player n =
   match n with
   | 0 -> "🨯"
@@ -43,6 +43,14 @@ let player_pos (game: game) p =
 let player_walls (game: game) p =
   snd (snd game).(p)
 
+let find_index f t =
+  let n = Array.length t in
+  let rec find i =
+    if i = n then None
+    else if f t.(i) then Some i
+    else find (i + 1)
+  in find 0
+
 let show_game (game: game) =
   let b, plyrs = game in
   Printf.printf "Joueur %s : %d murs\tJoueur %s : %d murs\n" (char_of_player 0) (player_walls game 0) (char_of_player 1) (player_walls game 1);
@@ -56,7 +64,7 @@ let show_game (game: game) =
   for i = 0 to dim - 1 do
     print_string "  ";
     for j = 0 to dim - 1 do
-      (match Array.find_index (fun a -> fst a = (i, j)) plyrs with (* ? Use of Array.find_index ? *)
+      (match find_index (fun a -> fst a = (i, j)) plyrs with
       | Some n_p -> print_string (char_of_player n_p)
       | None -> print_string "◌");
       if (j < dim - 1) && ((i < dim - 1 && b.(i).(j) = Some V) || (i > 0 && b.(i-1).(j) = Some V))
@@ -81,7 +89,6 @@ let show_game (game: game) =
   done;
 
 (* * Déplacement * *)
-
 exception Wrong_move
 
 let is_blocked x y dir b =
@@ -106,7 +113,7 @@ let rec try_jump game j m (x, y) dir plyrs =
   let new_x, new_y = x + dx, y + dy in
   if player_exists_at (new_x, new_y) plyrs then begin
     let jump_x, jump_y = x + 2 * dx, y + 2 * dy in
-    (* Check if two players are in a row (can't jump over two) *)
+    (* Empêche de sauter par dessus + de 2 joueurs *)
     if player_exists_at (jump_x, jump_y) plyrs then raise Wrong_move;
       plyrs.(j) <- (new_x, new_y), snd plyrs.(j);
       (try move game j m with Wrong_move -> (plyrs.(j) <- (x, y), snd plyrs.(j); raise Wrong_move));
@@ -121,8 +128,7 @@ and move (game: game) j m =
   let new_x, new_y = try_jump game j m (x, y) dir plyrs in
   plyrs.(j) <- (new_x, new_y), n
 
-(* * Entrées joueurs * *)
-
+(* * Entrées utilisateurs * *)
 let coords_of_input s =
   if String.length s <> 2 then raise (Invalid_argument "Entrée utilisateur trop longue/courte !")
   else begin
@@ -149,7 +155,6 @@ let move_of_input s =
   end
 
 (* * Placement de mur * *)
-(* TODO : vérifier qu'un chemin est toujours possible pour accèder d'un bord à l'autre *)
 exception Obstructed
 exception Insufficient_walls
 
